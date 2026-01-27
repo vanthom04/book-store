@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -20,9 +21,10 @@ interface Props {
   data: any[] | null
   executionTime?: string
   error?: string
+  className?: string
 }
 
-export const SqlResultViewer = ({ query, data, executionTime, error }: Props) => {
+export const SqlResultViewer = ({ query, data, executionTime, error, className }: Props) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
   const columns = data && data.length > 0 ? Object.keys(data[0]) : []
@@ -69,10 +71,10 @@ export const SqlResultViewer = ({ query, data, executionTime, error }: Props) =>
   }
 
   return (
-    <div className="space-y-4 w-full max-w-4xl mx-auto my-4">
+    <div className={cn("space-y-4 w-full max-w-5xl mx-auto my-4", className)}>
       {/* SQL TEXT */}
       <Card className="border-l-4 border-l-blue-500 bg-slate-950 text-white shadow-lg">
-        <CardHeader className="px-4 border-b border-slate-800 flex flex-row justify-between items-center py-3">
+        <CardHeader className="px-4 border-b border-slate-800 flex flex-row justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm text-blue-400 font-bold">SQL QUERY</span>
             {executionTime && (
@@ -83,7 +85,7 @@ export const SqlResultViewer = ({ query, data, executionTime, error }: Props) =>
           </div>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs text-slate-400 hover:text-white"
+            className="text-xs md:text-sm text-slate-400 hover:text-white"
           >
             {isExpanded ? "Thu gọn" : "Mở rộng"}
           </button>
@@ -94,7 +96,12 @@ export const SqlResultViewer = ({ query, data, executionTime, error }: Props) =>
             <SyntaxHighlighter
               language="sql"
               style={vscDarkPlus}
-              customStyle={{ margin: 0, padding: "1rem", background: "transparent" }}
+              customStyle={{
+                margin: 0,
+                paddingInline: "1rem",
+                paddingBlock: 0,
+                background: "transparent"
+              }}
               wrapLongLines={true}
             >
               {query}
@@ -109,22 +116,22 @@ export const SqlResultViewer = ({ query, data, executionTime, error }: Props) =>
           <strong>Lỗi truy vấn:</strong> {error}
         </div>
       ) : (
-        <Card className="overflow-hidden gap-4 py-4">
-          <CardHeader className="py-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-gray-600">
+        <Card className="overflow-hidden gap-4 py-2">
+          <CardHeader className="pt-2">
+            <CardTitle className="text-sm font-medium uppercase tracking-wide text-gray-600 pt-2">
               Kết quả ({data?.length || 0} dòng)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {data && data.length > 0 ? (
-              <div className="max-h-80 overflow-auto">
+              <div className="max-h-125 overflow-auto relative">
                 <Table>
-                  <TableHeader className="bg-gray-100 sticky top-0 z-10">
+                  <TableHeader className="bg-gray-100 sticky top-0 z-50 shadow-sm">
                     <TableRow>
                       {columns.map((col) => (
                         <TableHead
                           key={col}
-                          className="font-bold text-black whitespace-nowrap px-4"
+                          className="font-bold text-black whitespace-nowrap px-4 bg-gray-100"
                         >
                           {col}
                         </TableHead>
@@ -136,7 +143,6 @@ export const SqlResultViewer = ({ query, data, executionTime, error }: Props) =>
                       <TableRow key={index} className="hover:bg-gray-50">
                         {columns.map((col) => (
                           <TableCell key={`${index}-${col}`} className="font-mono text-xs px-4">
-                            {/* Gọi hàm renderCellValue đã viết ở trên */}
                             {renderCellValue(row[col])}
                           </TableCell>
                         ))}

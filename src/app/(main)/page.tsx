@@ -3,7 +3,8 @@ import Link from "next/link"
 import { getCurrentUser } from "@/actions/user"
 
 import { Header } from "./_components/header"
-import { HomeClient } from "./_components/client"
+import { AdminClient } from "./_components/admin-client"
+import { UserClient } from "./_components/user-client"
 
 export const dynamic = "force-dynamic"
 
@@ -24,7 +25,10 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col flex-1 min-h-screen">
       <Header user={user} />
-      <HomeClient user={user} />
+      <main className="flex flex-1">
+        {user.ROLE === "USER" && <UserClient />}
+        {user.ROLE === "ADMIN" && <AdminClient />}
+      </main>
     </div>
   )
 }

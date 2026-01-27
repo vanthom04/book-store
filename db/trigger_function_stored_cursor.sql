@@ -211,9 +211,91 @@ BEGIN
 END;
 GO
 
--- 2. Stored Procedure mua hàng (tạo đơn hàng mới)
+-- 2. Stored Procedure thêm sản phẩm vào giỏ hàng
+CREATE PROC sp_AddBookToCart (
+    @UserID INT,
+    @BookID INT,
+    @Quantity INT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @CartID INT;
+        DECLARE @CurrentQuantity INT;
+
+        -- Kiểm tra sách tồn tại và chưa bị xóa
+        IF NOT EXISTS (SELECT 1 FROM BOOKS WHERE BOOK_ID = @BookId AND IS_DELETED = 0)
+        BEGIN
+            RAISERROR(N'Sách không tồn tại hoặc đã bị xóa.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END;
+        
+        -- Kiểm tra tồn kho
+        SELECT @CurrentStock = QUANTITY FROM BOOKS WHERE BOOK_ID = @BookId;
+
+        IF @CurrentStock < @Quantity
+        BEGIN
+            RAISERROR(N'Số lượng tồn kho không đủ.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END;
+
+        -- Lấy hoặc tạo Cart cho user
+        SELECT @CartId = CART_ID FROM CARTS WHERE USER_ID = @UserId;
+
+        IF @CartId IS NULL
+        BEGIN
+            INSERT INTO CARTS (USER_ID)
+            VALUES (@UserId);
+
+            SET @CartId = SCOPE_IDENTITY();
+        END;
+
+        -- Nếu sách đã có trong giỏ → update số lượng
+        IF EXISTS (SELECT 1 FROM CART_ITEMS WHERE CART_ID = @CartId AND BOOK_ID = @BookId)
+        BEGIN
+            UPDATE CART_ITEMS
+            SET QUANTITY = QUANTITY + @Quantity, ADDED_AT = GETDATE()
+            WHERE CART_ID = @CartId AND BOOK_ID = @BookId;
+        END
+        ELSE
+        BEGIN
+            -- Nếu chưa có → insert mới
+            INSERT INTO CART_ITEMS (CART_ID, BOOK_ID, QUANTITY)
+            VALUES (@CartId, @BookId, @Quantity);
+        END;
+
+        -- Trừ tồn kho
+        UPDATE BOOKS
+        SET QUANTITY = QUANTITY - @Quantity
+        WHERE BOOK_ID = @BookId;
+
+        COMMIT TRANSACTION;
+
+        -- Trả kết quả cho web demo
+        SELECT 
+            @CartId AS CartId,
+            @BookId AS BookId,
+            @Quantity AS AddedQuantity,
+            N'Thêm sản phẩm vào giỏ hàng thành công' AS Message;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
+END;
+GO
+
+-- 3. Stored Procedure mua hàng (tạo đơn hàng mới)
 CREATE PROC sp_CreateOrder (
-    @UserId INT,
+    @UserID INT,
     @ReceiverName NVARCHAR(100),
     @ReceiverPhone VARCHAR(15),
     @ShippingAddress NVARCHAR(255),
@@ -226,14 +308,14 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @CartId INT;
-        DECLARE @NewOrderId INT;
+        DECLARE @CartID INT;
+        DECLARE @NewOrderID INT;
         DECLARE @TotalAmount DECIMAL(12, 2);
 
         -- Lấy CartId của user
-        SELECT @CartId = CART_ID FROM CARTS WHERE USER_ID = @UserId;
+        SELECT @CartID = CART_ID FROM CARTS WHERE USER_ID = @UserID;
 
-        IF @CartId IS NULL
+        IF @CartID IS NULL
         BEGIN
             RAISERROR(N'Người dùng chưa có giỏ hàng', 16, 1);
             ROLLBACK TRANSACTION;
@@ -241,7 +323,7 @@ BEGIN
         END;
 
         -- Kiểm tra giỏ hàng rỗng
-        IF NOT EXISTS (SELECT 1 FROM CART_ITEMS WHERE CART_ID = @CartId)
+        IF NOT EXISTS (SELECT 1 FROM CART_ITEMS WHERE CART_ID = @CartID)
         BEGIN
             RAISERROR(N'Giỏ hàng của bạn đang trống.', 16, 1);
             ROLLBACK TRANSACTION;
@@ -249,7 +331,7 @@ BEGIN
         END;
 
         -- Tạo đơn hàng
-        INSERT INTO ORDERS (USER_ID, RECEIVER_NAME, RECEIVER_PHONE, SHIPPING_ADDRESS, ORDER_DATE, TOTAL_AMOUNT, STATUS, PAYMENT_METHOD) VALUES (@UserID, @ReceiverName, @ReceiverPhone, @ShippingAddress, GETDATE(), 0, 'Pending', @PaymentMethod);
+        INSERT INTO ORDERS (USER_ID, RECEIVER_NAME, RECEIVER_PHONE, SHIPPING_ADDRESS, TOTAL_AMOUNT, STATUS, PAYMENT_METHOD) VALUES (@UserID, @ReceiverName, @ReceiverPhone, @ShippingAddress, 0, 'Pending', @PaymentMethod);
 
         -- Lấy ID của đơn hàng vừa tạo
         SET @NewOrderID = SCOPE_IDENTITY();
@@ -259,9 +341,9 @@ BEGIN
         SELECT @NewOrderID, ci.BOOK_ID, ci.QUANTITY, b.PRICE
         FROM CART_ITEMS ci
         JOIN BOOKS b ON ci.BOOK_ID = b.BOOK_ID
-        WHERE ci.CART_ID = @CartId;
+        WHERE ci.CART_ID = @CartID;
 
-        -- (Lúc này, Trigger TRG_CheckStockBeforeOrder sẽ chạy. 
+        -- (Lúc này, Trigger TRG_CheckStockBeforeOrder sẽ chạy.
         -- Nếu thiếu hàng, nó sẽ RAISERROR và nhảy xuống CATCH để Rollback)
 
         -- Cập nhật lại TOTAL_AMOUNT cho đơn hàng
@@ -292,7 +374,7 @@ BEGIN
 END;
 GO
 
--- 3. Stored Procedure
+-- 4. Stored Procedure
 CREATE PROC sp_GetUserOrderHistory (
     @UserID INT,
     @Status VARCHAR(20) = NULL
@@ -316,7 +398,7 @@ BEGIN
 END;
 GO
 
--- 4. Stored Procedure Thống kê doanh thu hàng tháng
+-- 5. Stored Procedure Thống kê doanh thu hàng tháng
 CREATE PROC sp_GetMonthlyRevenue (
     @Year INT
 )
@@ -345,7 +427,7 @@ BEGIN
 END;
 GO
 
--- 5. Stored Procedure top sách bán chạy
+-- 6. Stored Procedure top sách bán chạy
 CREATE PROC sp_GetBestSellingBooks (
     @Year INT,
     @Month INT = NULL,
@@ -375,7 +457,7 @@ BEGIN
 END;
 GO
 
--- 6. Stored Procedure cập nhật thông tin sách 
+-- 7. Stored Procedure cập nhật thông tin sách 
 CREATE PROC sp_UpdateBookInfo (
     @BookID INT,
     @BookName NVARCHAR(255),
@@ -436,7 +518,7 @@ BEGIN
 END;
 GO
 
--- 7. Stored Procedure lấy ngẫu nhiên sách
+-- 8. Stored Procedure lấy ngẫu nhiên sách
 CREATE PROCEDURE sp_GetRandomBooks
     @CurrentBookID INT,
     @TopN INT = 3
@@ -458,7 +540,7 @@ BEGIN
 END;
 GO
 
--- 8. Stored Procedure thống kê trang dashboard admin
+-- 9. Stored Procedure thống kê trang dashboard admin
 CREATE PROC sp_GetAdminDashboardStats
 AS
 BEGIN
