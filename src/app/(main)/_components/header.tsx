@@ -15,7 +15,7 @@ export const Header = ({ user }: any) => {
       </Link>
       <div className="text-center">
         <h1 className="text-base font-medium">Xin chào, {user.FULL_NAME}</h1>
-        <p className="text-base font-normal">
+        <p className="text-sm font-normal">
           Role: {user.ROLE} {user.ROLE === "ADMIN" ? "(Quản trị viên)" : "(Khách hàng)"}
         </p>
       </div>

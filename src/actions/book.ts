@@ -3,7 +3,7 @@
 import { getPool } from "@/lib/db"
 import { withTiming } from "@/lib/utils"
 
-export async function getBooks() {
+export async function getBooks(): Promise<any> {
   return withTiming(async () => {
     const queryText = `SELECT
     BOOK_ID AS ID,
@@ -28,7 +28,6 @@ ORDER BY CREATED_AT DESC
         success: true,
         sqlText: queryText,
         result: result.recordset,
-        error: null
       }
     } catch (error) {
       console.error("Error fetching books: ", error)

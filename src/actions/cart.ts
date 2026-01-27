@@ -23,9 +23,9 @@ WHERE C.USER_ID = ${user.USER_ID}
       const pool = await getPool()
       const result = await pool.request().query(queryText)
       return {
+        success: true,
         sqlText: queryText,
-        result: result.recordset,
-        success: true
+        result: result.recordset
       }
     } catch (error) {
       console.error("Error query:", error)
@@ -34,6 +34,36 @@ WHERE C.USER_ID = ${user.USER_ID}
         sqlText: queryText,
         result: null,
         error: "Lỗi khi truy xuất giỏ hàng."
+      }
+    }
+  })
+}
+
+export async function addToCart(bookId: number, quantity: number) {
+  const user = await getCurrentUser()
+
+  return withTiming(async () => {
+    const queryText = `EXEC sp_AddToCart
+    @UserID = ${user.USER_ID},
+    @BookID = ${bookId},
+    @Quantity = ${quantity};
+`
+    try {
+      const pool = await getPool()
+      const result = await pool.request().query(queryText)
+
+      return {
+        success: true,
+        sqlText: queryText,
+        result: result.recordset
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      return {
+        success: false,
+        sqlText: queryText,
+        result: null,
+        error: "Lỗi khi thêm vào giỏ hàng."
       }
     }
   })

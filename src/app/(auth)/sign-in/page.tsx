@@ -63,7 +63,10 @@ export default function SignInPage() {
   return (
     <>
       <AlertDialog open={!!demoSql} onOpenChange={(open) => !open && setDemoSql(null)}>
-        <AlertDialogContent className="max-w-5xl! max-h-[90vh] overflow-y-auto">
+        <AlertDialogContent
+          className="max-w-6xl! max-h-[90vh] overflow-y-auto"
+          aria-describedby={undefined}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle className="text-green-600 font-bold">
               ⚡DEMO: SQL Server Response
