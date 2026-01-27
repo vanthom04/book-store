@@ -22,26 +22,23 @@ END;
 GO
 
 -- 2. Function kiểm tra tồn kho khi có phát sinh đơn
-CREATE FUNCTION fn_CheckStockForOrder (@OrderID INT)
-RETURNS BIT
+CREATE FUNCTION fn_GetBestSellingBooks (@Top INT)
+RETURNS TABLE
 AS
-BEGIN
-    DECLARE @IsAvailable BIT = 1;
-    
-    -- Kiểm tra xem có sách nào không đủ số lượng không
-    IF EXISTS (
-        SELECT 1
-        FROM ORDER_DETAILS od
-        INNER JOIN BOOKS b ON od.BOOK_ID = b.BOOK_ID
-        WHERE od.ORDER_ID = @OrderID
-          AND b.QUANTITY < od.QUANTITY
-    )
-    BEGIN
-        SET @IsAvailable = 0;
-    END
-    
-    RETURN @IsAvailable;
-END;
+RETURN (
+    SELECT TOP (@Top)
+        b.BOOK_ID,
+        b.BOOK_NAME,
+        b.PRICE,
+        b.IMAGE,
+        SUM(od.QUANTITY) AS TotalSold
+    FROM BOOKS b
+    JOIN ORDER_DETAILS od ON b.BOOK_ID = od.BOOK_ID
+    JOIN ORDERS o ON od.ORDER_ID = o.ORDER_ID
+    WHERE o.STATUS = 'Completed' -- Chỉ tính các đơn đã bán thành công
+    GROUP BY b.BOOK_ID, b.BOOK_NAME, b.PRICE, b.IMAGE
+    ORDER BY TotalSold DESC
+);
 GO
 
 -- 3. Function tính doanh thu theo ngày
@@ -66,7 +63,7 @@ END;
 GO
 
 -- ============================= TRIGGER =============================
--- 1. Quản lý tồn kho: Trừ khi mua (Pending -> Processing) và Hoàn khi hủy
+-- 1. Quản lý tồn kho: Trừ khi mua (Pending -> Delivering) và Hoàn khi hủy (Cancelled)
 CREATE TRIGGER TRG_InventoryManagement
 ON ORDERS
 AFTER UPDATE
@@ -74,7 +71,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- 1. Trừ kho khi đơn hàng được xác nhận (Chuyển từ Pending sang Processing)
+    -- Trừ kho khi đơn hàng được xác nhận (Chuyển từ Pending sang Delivering)
     IF UPDATE(STATUS)
     BEGIN
         UPDATE B
@@ -83,16 +80,17 @@ BEGIN
         INNER JOIN ORDER_DETAILS OD ON B.BOOK_ID = OD.BOOK_ID
         INNER JOIN inserted I ON OD.ORDER_ID = I.ORDER_ID
         INNER JOIN deleted D ON I.ORDER_ID = D.ORDER_ID
-        WHERE I.STATUS = 'Processing' AND D.STATUS = 'Pending';
+        WHERE I.STATUS = 'Delivering' AND D.STATUS = 'Pending';
 
-        -- 3. Hoàn kho khi đơn hàng bị hủy (Chuyển sang Cancelled)
+        -- Hoàn kho khi đơn hàng bị hủy (Chuyển sang Cancelled)
+        -- Chỉ hoàn kho nếu trạng thái cũ là 'Delivering' hoặc 'Completed'
         UPDATE B
         SET B.QUANTITY = B.QUANTITY + OD.QUANTITY
         FROM BOOKS B
         INNER JOIN ORDER_DETAILS OD ON B.BOOK_ID = OD.BOOK_ID
         INNER JOIN inserted I ON OD.ORDER_ID = I.ORDER_ID
         INNER JOIN deleted D ON I.ORDER_ID = D.ORDER_ID
-        WHERE I.STATUS = 'Cancelled' AND D.STATUS <> 'Cancelled';
+        WHERE I.STATUS = 'Cancelled' AND (D.STATUS = 'Delivering' OR D.STATUS = 'Completed');
     END
 END
 GO
@@ -212,7 +210,7 @@ END;
 GO
 
 -- 2. Stored Procedure thêm sản phẩm vào giỏ hàng
-CREATE PROC sp_AddBookToCart (
+CREATE PROC sp_AddToCart (
     @UserID INT,
     @BookID INT,
     @Quantity INT
@@ -224,63 +222,76 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @CartID INT;
-        DECLARE @CurrentQuantity INT;
+        -- Kiểm tra user hợp lệ
+        IF NOT EXISTS (SELECT 1 FROM USERS WHERE USER_ID = @UserID AND IS_ACTIVE = 1)
+        BEGIN
+            RAISERROR(N'Người dùng không hợp lệ hoặc đã bị khóa.', 16, 1);
+            RETURN;
+        END;
 
-        -- Kiểm tra sách tồn tại và chưa bị xóa
-        IF NOT EXISTS (SELECT 1 FROM BOOKS WHERE BOOK_ID = @BookId AND IS_DELETED = 0)
+        -- Kiểm tra số lượng hợp lệ
+        IF @Quantity <= 0
+        BEGIN
+            RAISERROR(N'Số lượng phải lớn hơn 0.', 16, 1);
+            RETURN;
+        END;
+
+        DECLARE @CartID INT;
+        DECLARE @CurrentStock INT;
+        DECLARE @ExistingInCart INT;
+
+        -- Kiểm tra sách tồn tại, chưa bị xóa và lấy tồn kho hiện tại
+        SELECT @CurrentStock = QUANTITY FROM BOOKS WHERE BOOK_ID = @BookID AND IS_DELETED = 0;
+
+        IF @CurrentStock IS NULL
         BEGIN
             RAISERROR(N'Sách không tồn tại hoặc đã bị xóa.', 16, 1);
             ROLLBACK TRANSACTION;
             RETURN;
         END;
-        
-        -- Kiểm tra tồn kho
-        SELECT @CurrentStock = QUANTITY FROM BOOKS WHERE BOOK_ID = @BookId;
 
-        IF @CurrentStock < @Quantity
+        -- Lấy CartID của user
+        SELECT @CartID = CART_ID FROM CARTS WHERE USER_ID = @UserID;
+
+        IF @CartID IS NULL
+        BEGIN
+            INSERT INTO CARTS (USER_ID)
+            VALUES (@UserID);
+
+            SET @CartID = SCOPE_IDENTITY();
+        END;
+        
+        SELECT @ExistingInCart = QUANTITY
+        FROM CART_ITEMS
+        WHERE CART_ID = @CartID AND BOOK_ID = @BookID;
+
+        IF (@ExistingInCart + @Quantity) > @CurrentStock
         BEGIN
             RAISERROR(N'Số lượng tồn kho không đủ.', 16, 1);
             ROLLBACK TRANSACTION;
             RETURN;
         END;
 
-        -- Lấy hoặc tạo Cart cho user
-        SELECT @CartId = CART_ID FROM CARTS WHERE USER_ID = @UserId;
-
-        IF @CartId IS NULL
-        BEGIN
-            INSERT INTO CARTS (USER_ID)
-            VALUES (@UserId);
-
-            SET @CartId = SCOPE_IDENTITY();
-        END;
-
         -- Nếu sách đã có trong giỏ → update số lượng
-        IF EXISTS (SELECT 1 FROM CART_ITEMS WHERE CART_ID = @CartId AND BOOK_ID = @BookId)
+        IF @ExistingInCart > 0
         BEGIN
             UPDATE CART_ITEMS
             SET QUANTITY = QUANTITY + @Quantity, ADDED_AT = GETDATE()
-            WHERE CART_ID = @CartId AND BOOK_ID = @BookId;
+            WHERE CART_ID = @CartID AND BOOK_ID = @BookID;
         END
         ELSE
         BEGIN
             -- Nếu chưa có → insert mới
             INSERT INTO CART_ITEMS (CART_ID, BOOK_ID, QUANTITY)
-            VALUES (@CartId, @BookId, @Quantity);
+            VALUES (@CartID, @BookID, @Quantity);
         END;
-
-        -- Trừ tồn kho
-        UPDATE BOOKS
-        SET QUANTITY = QUANTITY - @Quantity
-        WHERE BOOK_ID = @BookId;
 
         COMMIT TRANSACTION;
 
-        -- Trả kết quả cho web demo
+        -- Trả kết quả
         SELECT 
-            @CartId AS CartId,
-            @BookId AS BookId,
+            @CartID AS CartID,
+            @BookID AS BookID,
             @Quantity AS AddedQuantity,
             N'Thêm sản phẩm vào giỏ hàng thành công' AS Message;
     END TRY
@@ -312,7 +323,7 @@ BEGIN
         DECLARE @NewOrderID INT;
         DECLARE @TotalAmount DECIMAL(12, 2);
 
-        -- Lấy CartId của user
+        -- Lấy CartID của user
         SELECT @CartID = CART_ID FROM CARTS WHERE USER_ID = @UserID;
 
         IF @CartID IS NULL
@@ -331,7 +342,7 @@ BEGIN
         END;
 
         -- Tạo đơn hàng
-        INSERT INTO ORDERS (USER_ID, RECEIVER_NAME, RECEIVER_PHONE, SHIPPING_ADDRESS, TOTAL_AMOUNT, STATUS, PAYMENT_METHOD) VALUES (@UserID, @ReceiverName, @ReceiverPhone, @ShippingAddress, 0, 'Pending', @PaymentMethod);
+        INSERT INTO ORDERS (USER_ID, RECEIVER_NAME, RECEIVER_PHONE, SHIPPING_ADDRESS, TOTAL_AMOUNT, PAYMENT_METHOD) VALUES (@UserID, @ReceiverName, @ReceiverPhone, @ShippingAddress, 0, @PaymentMethod);
 
         -- Lấy ID của đơn hàng vừa tạo
         SET @NewOrderID = SCOPE_IDENTITY();
@@ -449,7 +460,7 @@ BEGIN
     JOIN ORDERS o ON od.ORDER_ID = o.ORDER_ID
     JOIN BOOKS b ON od.BOOK_ID = b.BOOK_ID
     JOIN AUTHORS a ON b.AUTHOR_ID = a.AUTHOR_ID
-    WHERE o.STATUS <> 'Cancelled'
+    WHERE o.STATUS = 'Completed'
         AND YEAR(o.ORDER_DATE) = @Year
         AND (@Month IS NULL OR MONTH(o.ORDER_DATE) = @Month)
     GROUP BY b.BOOK_ID, b.BOOK_NAME, b.IMAGE, b.PRICE, a.AUTHOR_NAME
@@ -461,7 +472,6 @@ GO
 CREATE PROC sp_UpdateBookInfo (
     @BookID INT,
     @BookName NVARCHAR(255),
-    @Slug VARCHAR(255),
     @PublishYear INT,
     @Language NVARCHAR(50),
     @Pages INT,
@@ -484,18 +494,10 @@ BEGIN
             RETURN;
         END;
 
-        -- Kiểm tra SLUG có bị trùng với sách khác không
-        IF EXISTS (SELECT 1 FROM BOOKS WHERE SLUG = @Slug AND BOOK_ID <> @BookID)
-        BEGIN
-            RAISERROR(N'Slug này đã tồn tại cho một sách khác!', 16, 1);
-            RETURN;
-        END;
-
         -- Cập nhật thông tin sách
         UPDATE BOOKS
         SET
             BOOK_NAME = @BookName,
-            SLUG = @Slug,
             PUBLISH_YEAR = @PublishYear,
             LANGUAGE = @Language,
             PAGES = @Pages,
@@ -529,7 +531,6 @@ BEGIN
     SELECT TOP (@TopN)
         b.BOOK_ID,
         b.BOOK_NAME,
-        b.SLUG,
         b.IMAGE,
         b.PRICE,
         a.AUTHOR_NAME

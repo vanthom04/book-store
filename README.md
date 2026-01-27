@@ -2,6 +2,14 @@
 
 Hệ thống quản lý cửa hàng bán sách được xây dựng bằng **Next.js** với cơ sở dữ liệu **SQL Server**. Dự án demo các tính năng quản lý sách, đơn hàng, khách hàng và tài khoản người dùng.
 
+## 📂 Cấu trúc dự án
+
+- `app/`: Chứa các trang giao diện (Login, Dashboard...).
+- `components/`: Các thành phần giao diện nhỏ (Nút bấm, bảng, popup...).
+- `lib/db.ts`: File cấu hình kết nối CSDL.
+- `actions/`: Chứa code xử lý Logic (Đăng nhập, thêm sửa xóa...).
+
+
 ## 🛠️ 1. Cài đặt các công cụ cần thiết (Chỉ làm 1 lần đầu)
 
 Trước khi bắt đầu, hãy đảm bảo máy tính của bạn đã có những thứ sau:
@@ -14,7 +22,6 @@ Trước khi bắt đầu, hãy đảm bảo máy tính của bạn đã có nh�
     - Đã cài **SSMS** (SQL Server Management Studio) để quản lý dữ liệu.
 3. **Visual Studio Code (VS Code)**: Để mở code (nếu chưa có).
 
----
 
 ## 🚀 2. Cách tải và chạy dự án
 
@@ -96,7 +103,6 @@ npm run start
 
 *Lưu ý: Để tắt server đang chạy, hãy bấm tổ hợp phím `Ctrl + C` trong Terminal.*
 
----
 
 ## ⚠️ 3. SỬA LỖI KẾT NỐI SQL SERVER (Đọc kỹ nếu bị lỗi)
 
@@ -139,19 +145,11 @@ Làm xong A và B mà không làm bước này thì cũng vô dụng.
 
 => **XONG!** Bây giờ quay lại VS Code chạy `npm run dev` là sẽ kết nối được ngon lành.
 
----
-
-## 📂 Cấu trúc dự án
-
-- `app/`: Chứa các trang giao diện (Login, Dashboard...).
-- `components/`: Các thành phần giao diện nhỏ (Nút bấm, bảng, popup...).
-- `lib/db.ts`: File cấu hình kết nối CSDL.
-- `actions/`: Chứa code xử lý Logic (Đăng nhập, thêm sửa xóa...).
-
---- 
 
 ## Một số lưu ý:
 1.  **Database Script**: Em có gửi kèm file script `.sql` (Tạo bảng, Trigger, Stored Procedure) ở trong thư mục `db` cho mọi người rồi nên nếu ai mà chưa chạy SQL thì hãy chạy SQL trước khi chạy web nha. (Nhớ chạy file `insert_data.sql` trước khi chạy file `trigger_function_stored_cursor.sql`)
 
 ---
+Authored by Team 9 - QLTT (IE103.F12.LT.CNTT)
+
 *Happy Coding! 🚀*

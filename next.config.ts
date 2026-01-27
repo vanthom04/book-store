@@ -1,7 +1,19 @@
-import type { NextConfig } from "next"
+import { type NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactCompiler: true,
+  images: {
+    remotePatterns: [
+      { protocol: "http", hostname: "**" },
+      { protocol: "https", hostname: "**" }
+    ]
+  },
+  serverExternalPackages: ["mssql"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb"
+    }
+  }
 }
 
 export default nextConfig

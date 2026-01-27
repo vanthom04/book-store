@@ -31,7 +31,7 @@ export const SqlResultViewer = ({ query, data, executionTime, error, className }
 
   const renderCellValue = (value: any) => {
     if (value === null || value === undefined) {
-      return <span className="text-gray-300">NULL</span>
+      return <span className="text-gray-300 italic">NULL</span>
     }
 
     if (typeof value === "boolean") {
@@ -43,12 +43,12 @@ export const SqlResultViewer = ({ query, data, executionTime, error, className }
     }
 
     if (value instanceof Date) {
-      return value.toLocaleString("vi-VN")
+      return <span className="whitespace-nowrap">{value.toLocaleString("vi-VN")}</span>
     }
 
     if (typeof value === "object") {
       return (
-        <div className="overflow-auto rounded-md border border-slate-700">
+        <div className="max-w-sm max-h-37.5 overflow-auto rounded-md border border-slate-700 bg-[#1e1e1e]">
           <SyntaxHighlighter
             language="json"
             style={vscDarkPlus}
@@ -56,7 +56,7 @@ export const SqlResultViewer = ({ query, data, executionTime, error, className }
               margin: 0,
               padding: "0.5rem",
               fontSize: "0.7rem",
-              backgroundColor: "#1e1e1e",
+              backgroundColor: "transparent",
               lineHeight: "1.2"
             }}
             wrapLongLines={true}
@@ -67,7 +67,17 @@ export const SqlResultViewer = ({ query, data, executionTime, error, className }
       )
     }
 
-    return String(value)
+    const stringValue = String(value)
+
+    if (stringValue.length < 50) {
+      return stringValue
+    }
+
+    return (
+      <div className="max-w-62.5 truncate" title={stringValue}>
+        {stringValue}
+      </div>
+    )
   }
 
   return (
@@ -112,14 +122,18 @@ export const SqlResultViewer = ({ query, data, executionTime, error, className }
 
       {/* RESULT */}
       {error ? (
-        <div className="p-4 bg-red-100 text-red-700 border border-red-300 rounded-md">
-          <strong>Lỗi truy vấn:</strong> {error}
+        <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-md shadow-sm">
+          <strong className="block mb-1">Lỗi truy vấn:</strong>
+          <span className="font-mono text-sm">{error}</span>
         </div>
       ) : (
         <Card className="overflow-hidden gap-4 py-2">
           <CardHeader className="pt-2">
             <CardTitle className="text-sm font-medium uppercase tracking-wide text-gray-600 pt-2">
-              Kết quả ({data?.length || 0} dòng)
+              Kết quả
+              <Badge variant="outline" className="text-gray-600 ml-2">
+                {data?.length || 0} dòng
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">

@@ -5,6 +5,7 @@ import { useState } from "react"
 
 import { getBooks } from "@/actions/book"
 import { Button } from "@/components/ui/button"
+import { getCartDetails } from "@/actions/cart"
 import { Separator } from "@/components/ui/separator"
 import { SqlResultViewer } from "@/components/sql-result-viewer"
 
@@ -63,7 +64,7 @@ export const UserClient = () => {
           className="w-full"
           variant="secondary"
           disabled={isPending}
-          onClick={() => {}}
+          onClick={() => handleAction("Xem thông tin giỏ hàng", getCartDetails)}
         >
           Xem giỏ hàng
         </Button>
