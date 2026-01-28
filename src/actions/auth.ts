@@ -57,9 +57,13 @@ export const signIn = async (email: string, password: string) => {
       sqlText: sqlDisplay,
       result: result.recordset
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Sign-in error:", error)
-    return { error: "Lỗi hệ thống. Vui lòng thử lại sau.", sqlText: sqlDisplay, result: null }
+    return {
+      error: error.message || "Lỗi hệ thống. Vui lòng thử lại sau.",
+      sqlText: sqlDisplay,
+      result: null
+    }
   }
 }
 
@@ -101,11 +105,11 @@ export const signUp = async (fullName: string, email: string, password: string) 
       sqlText: sqlDisplay,
       result: result.recordset
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Sign-up error:", error)
     return {
       success: false,
-      error: "Lỗi hệ thống. Vui lòng thử lại sau.",
+      error: error.message || "Lỗi hệ thống. Vui lòng thử lại sau.",
       sqlText: sqlDisplay,
       result: null
     }

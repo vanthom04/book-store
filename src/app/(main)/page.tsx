@@ -1,10 +1,10 @@
 import Link from "next/link"
 
+import { Header } from "@/components/header"
 import { getCurrentUser } from "@/actions/user"
 
-import { Header } from "./_components/header"
-import { AdminClient } from "./_components/admin-client"
-import { UserClient } from "./_components/user-client"
+import { UserDashboardView } from "@/features/user/components/user-dashboard-view"
+import { AdminDashboardView } from "@/features/admin/components/admin-dashboard-view"
 
 export const dynamic = "force-dynamic"
 
@@ -26,8 +26,8 @@ export default async function HomePage() {
     <div className="flex flex-col flex-1 min-h-screen">
       <Header user={user} />
       <main className="flex flex-1">
-        {user.ROLE === "USER" && <UserClient />}
-        {user.ROLE === "ADMIN" && <AdminClient />}
+        {user.ROLE === "USER" && <UserDashboardView />}
+        {user.ROLE === "ADMIN" && <AdminDashboardView />}
       </main>
     </div>
   )

@@ -18,7 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="vi" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         {children}
-        <Toaster richColors />
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   )

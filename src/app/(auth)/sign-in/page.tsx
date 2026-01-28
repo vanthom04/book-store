@@ -69,7 +69,7 @@ export default function SignInPage() {
         >
           <AlertDialogHeader>
             <AlertDialogTitle className="text-green-600 font-bold">
-              ⚡DEMO: SQL Server Response
+              ⚡DEMO: Đăng nhập
             </AlertDialogTitle>
           </AlertDialogHeader>
 

@@ -8,12 +8,18 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { getCartDetails, addToCart } from "@/actions/cart"
 import { SqlResultViewer } from "@/components/sql-result-viewer"
+import { createOrder, getOrdersHistory, cancelOrder } from "@/actions/order"
 
 import { AddToCartModal } from "./add-to-cart-modal"
+import { CreateOrderModal } from "./create-order-modal"
+import { CancelOrderModal } from "./cancel-order-modal"
 
-export const UserClient = () => {
+export const UserDashboardView = () => {
   const [isPending, setIsPending] = useState(false)
+  const [showCancelOrderModal, setShowCancelOrderModal] = useState(false)
   const [showAddToCartModal, setShowAddToCartModal] = useState(false)
+  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false)
+  const [actionName, setActionName] = useState<string | null>(null)
   const [demoSql, setDemoSql] = useState<{
     query: string
     data: any[]
@@ -31,6 +37,7 @@ export const UserClient = () => {
     try {
       const res = await actionFn()
 
+      setActionName(actionName)
       setDemoSql({
         query: res.sqlText,
         data: res.result || [],
@@ -47,7 +54,6 @@ export const UserClient = () => {
       console.error(error)
     } finally {
       setIsPending(false)
-      setShowAddToCartModal(false)
     }
   }
 
@@ -56,11 +62,30 @@ export const UserClient = () => {
       <AddToCartModal
         isOpen={showAddToCartModal}
         onClose={() => setShowAddToCartModal(false)}
-        onAction={(bookId) =>
+        onAction={(bookId) => {
+          setShowAddToCartModal(false)
           handleAction("Thêm vào giỏ hàng", () =>
             addToCart(bookId, Number(prompt("Số lượng sách muốn thêm vào giỏ hàng?", "1")))
           )
-        }
+        }}
+      />
+      <CreateOrderModal
+        isOpen={showCreateOrderModal}
+        onClose={() => setShowCreateOrderModal(false)}
+        onAction={(orderData) => {
+          setShowCreateOrderModal(false)
+          handleAction("Tạo đơn hàng", () =>
+            createOrder(orderData.name, orderData.phone, orderData.address, orderData.payment)
+          )
+        }}
+      />
+      <CancelOrderModal
+        isOpen={showCancelOrderModal}
+        onClose={() => setShowCancelOrderModal(false)}
+        onAction={(orderId) => {
+          setShowCancelOrderModal(false)
+          handleAction("Hủy đơn hàng", () => cancelOrder(orderId))
+        }}
       />
       <div className="flex flex-1 px-4 lg:px-6 py-4 items-stretch">
         <div className="w-1/4 space-y-4 overflow-y-auto">
@@ -96,7 +121,7 @@ export const UserClient = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowCreateOrderModal(true)}
           >
             Tạo đơn hàng
           </Button>
@@ -105,7 +130,7 @@ export const UserClient = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowCancelOrderModal(true)}
           >
             Hủy đơn hàng
           </Button>
@@ -114,14 +139,23 @@ export const UserClient = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() =>
+              handleAction("Xem lịch sử mua hàng", () =>
+                getOrdersHistory(
+                  prompt(
+                    "Nhập trạng thái đơn hàng (Pending, Completed, Cancelled).",
+                    "Pending"
+                  )?.trim()
+                )
+              )
+            }
           >
-            Lịch sử mua hàng
+            Xem lịch sử mua hàng
           </Button>
         </div>
         <Separator orientation="vertical" className="mx-4" />
         <div className="w-3/4 overflow-y-auto">
-          <h2 className="text-xl font-bold mb-4">⚡DEMO: SQL Server Response</h2>
+          <h2 className="text-xl font-bold mb-4">⚡DEMO: {actionName || "SQL Server Response"}</h2>
           <SqlResultViewer
             query={demoSql.query}
             data={demoSql.data}

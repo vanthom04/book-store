@@ -62,7 +62,7 @@ export default function SignUpPage() {
         >
           <AlertDialogHeader>
             <AlertDialogTitle className="text-green-600 font-bold">
-              ⚡DEMO: SQL Server Response
+              ⚡DEMO: Đăng ký tài khoản mới
             </AlertDialogTitle>
           </AlertDialogHeader>
 
@@ -72,8 +72,11 @@ export default function SignUpPage() {
             <Button variant="outline" onClick={() => setDemoSql(null)}>
               Đóng
             </Button>
-            <Button onClick={() => router.push("/")} className="bg-green-600 hover:bg-green-700">
-              Đi tới Trang chủ
+            <Button
+              onClick={() => router.push("/sign-in")}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Đi tới Trang đăng nhập
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

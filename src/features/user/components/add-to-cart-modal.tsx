@@ -28,11 +28,14 @@ export const AddToCartModal = ({ isOpen, onClose, onAction }: Props) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl! max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-4xl! h-[90vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>Thêm sách vào giỏ hàng</DialogTitle>
         </DialogHeader>
-        <div className="h-87.5 overflow-y-auto">
+        <div className="h-full overflow-y-auto">
           {books.length > 0 &&
             books.map((book: any) => (
               <div key={book.ID} className="flex items-center gap-2 border-b p-2">
@@ -41,13 +44,19 @@ export const AddToCartModal = ({ isOpen, onClose, onAction }: Props) => {
                   <Image
                     fill
                     className="object-cover"
-                    src={book["URL Ảnh Bìa"]}
-                    alt={book["Tên Sách"]}
+                    src={book["URL ảnh bìa"]}
+                    alt={book["Tên sách"]}
                   />
                 </div>
                 <div className="flex flex-col flex-1">
-                  <p className="text-sm font-medium truncate">{book["Tên Sách"]}</p>
-                  <p className="text-xs truncate">{book["Tác Giả"]}</p>
+                  <p className="text-sm font-medium truncate">{book["Tên sách"]}</p>
+                  <p className="text-xs truncate">{book["Tác giả"]}</p>
+                </div>
+                <div className="text-sm text-muted-foreground px-4 lg:px-6">
+                  {book["Giá"].toLocaleString("vi-VN", { style: "currency", currency: "VND" })}
+                </div>
+                <div className="text-sm text-muted-foreground px-4 lg:px-6">
+                  Tồn kho: {book["Số lượng"]}
                 </div>
                 <Button onClick={() => onAction(book.ID)}>Thêm giỏ hàng</Button>
               </div>

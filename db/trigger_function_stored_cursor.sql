@@ -205,7 +205,7 @@ BEGIN
     INSERT INTO USERS (FULL_NAME, EMAIL, PASSWORD_HASH, PHONE, ADDRESS) VALUES (@FullName, @Email, @PasswordHash, @Phone, @Address);
 
     -- Trả về thông báo thành công
-    SELECT N'Đăng ký tài khoản thành công!' AS Message, SCOPE_IDENTITY() AS NewUserID;
+    SELECT SCOPE_IDENTITY() AS NewUserID, N'Đăng ký tài khoản thành công!' AS [Thông báo];
 END;
 GO
 
@@ -292,8 +292,8 @@ BEGIN
         SELECT 
             @CartID AS CartID,
             @BookID AS BookID,
-            @Quantity AS AddedQuantity,
-            N'Thêm sản phẩm vào giỏ hàng thành công' AS Message;
+            @Quantity AS [Số lượng đã thêm],
+            N'Thêm sản phẩm vào giỏ hàng thành công' AS [Thông báo];
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -354,8 +354,7 @@ BEGIN
         JOIN BOOKS b ON ci.BOOK_ID = b.BOOK_ID
         WHERE ci.CART_ID = @CartID;
 
-        -- (Lúc này, Trigger TRG_CheckStockBeforeOrder sẽ chạy.
-        -- Nếu thiếu hàng, nó sẽ RAISERROR và nhảy xuống CATCH để Rollback)
+        -- Trigger TRG_CheckStockBeforeOrder sẽ kiểm tra tồn kho và chặn nếu không đủ
 
         -- Cập nhật lại TOTAL_AMOUNT cho đơn hàng
         SET @TotalAmount = dbo.fn_CalculateOrderTotal(@NewOrderID);
@@ -372,8 +371,8 @@ BEGIN
         -- Trả về thông báo thành công
         SELECT 
             @NewOrderID AS OrderID,
-            N'Đặt hàng thành công' AS Message,
-            @TotalAmount AS TotalAmount;
+            N'Đặt hàng thành công' AS [Thông báo],
+            @TotalAmount AS [Tổng số tiền];
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -395,17 +394,17 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT 
-        ORDER_ID,
-        ORDER_DATE,
-        TOTAL_AMOUNT,
-        STATUS,
-        PAYMENT_METHOD,
-        RECEIVER_NAME,
-        SHIPPING_ADDRESS,
-        (SELECT COUNT(*) FROM ORDER_DETAILS WHERE ORDER_ID = o.ORDER_ID) AS TotalItems
+        ORDER_ID AS OrderID,
+        RECEIVER_NAME AS [Tên người nhận],
+        SHIPPING_ADDRESS AS [Địa chỉ giao hàng],
+        TOTAL_AMOUNT AS [Tổng tiền],
+        PAYMENT_METHOD AS [Phương thức thanh toán],
+        STATUS AS [Trạng thái],
+        ORDER_DATE AS [Ngày đặt hàng],
+        (SELECT COUNT(*) FROM ORDER_DETAILS WHERE ORDER_ID = o.ORDER_ID) AS [Số lượng sản phẩm]
     FROM ORDERS o
-    WHERE USER_ID = @UserID
-    ORDER BY  ORDER_DATE DESC;
+    WHERE USER_ID = @UserID AND (@Status IS NULL OR STATUS = @Status)
+    ORDER BY ORDER_DATE DESC;
 END;
 GO
 
@@ -425,9 +424,9 @@ BEGIN
     )
     -- Join với table ORDERS để tính tổng doanh thu
     SELECT
-        m.MonthNum AS [Month],
-        COALESCE(SUM(o.TOTAL_AMOUNT), 0) AS TotalRevenue,
-        COUNT(o.ORDER_ID) AS TotalOrders
+        m.MonthNum AS [Tháng],
+        COALESCE(SUM(o.TOTAL_AMOUNT), 0) AS [Tổng doanh thu],
+        COUNT(o.ORDER_ID) AS [Tổng số đơn đặt hàng]
     FROM MonthList m
     LEFT JOIN ORDERS o
         ON MONTH(o.ORDER_DATE) = m.MonthNum
@@ -449,13 +448,13 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT TOP (@TopN)
-        b.BOOK_ID,
-        b.BOOK_NAME,
-        a.AUTHOR_NAME,
-        b.PRICE,
-        b.IMAGE,
-        SUM(od.QUANTITY) AS TotalSold,
-        SUM(od.QUANTITY * od.PRICE) AS RevenueGenerated
+        b.BOOK_ID AS BookID,
+        b.BOOK_NAME AS [Tên sách],
+        a.AUTHOR_NAME AS [Tác giả],
+        b.PRICE AS [Giá bán],
+        b.IMAGE AS [Hình ảnh],
+        SUM(od.QUANTITY) AS [Tổng số đã bán],
+        SUM(od.QUANTITY * od.PRICE) AS [Tổng doanh thu]
     FROM ORDER_DETAILS od
     JOIN ORDERS o ON od.ORDER_ID = o.ORDER_ID
     JOIN BOOKS b ON od.BOOK_ID = b.BOOK_ID
@@ -464,7 +463,7 @@ BEGIN
         AND YEAR(o.ORDER_DATE) = @Year
         AND (@Month IS NULL OR MONTH(o.ORDER_DATE) = @Month)
     GROUP BY b.BOOK_ID, b.BOOK_NAME, b.IMAGE, b.PRICE, a.AUTHOR_NAME
-    ORDER BY TotalSold DESC;
+    ORDER BY [Tổng số đã bán] DESC;
 END;
 GO
 
@@ -511,7 +510,7 @@ BEGIN
         WHERE BOOK_ID = @BookID;
 
         -- Trả về thông báo thành công
-        SELECT N'Cập nhật sách thành công' AS Message, @BookID AS BookID;
+        SELECT @BookID AS BookID, N'Cập nhật sách thành công' AS [Thông báo];
     END TRY
     BEGIN CATCH
         DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
@@ -520,24 +519,41 @@ BEGIN
 END;
 GO
 
--- 8. Stored Procedure lấy ngẫu nhiên sách
-CREATE PROCEDURE sp_GetRandomBooks
-    @CurrentBookID INT,
-    @TopN INT = 3
+-- 8. Stored Procedure hủy đơn hàng
+CREATE PROCEDURE sp_CancelOrder
+    @UserID INT,
+    @OrderID INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT TOP (@TopN)
-        b.BOOK_ID,
-        b.BOOK_NAME,
-        b.IMAGE,
-        b.PRICE,
-        a.AUTHOR_NAME
-    FROM BOOKS b
-    JOIN AUTHORS a ON b.AUTHOR_ID = a.AUTHOR_ID
-    WHERE b.BOOK_ID <> @CurrentBookID AND (b.IS_DELETED IS NULL OR b.IS_DELETED = 0)
-    ORDER BY NEWID();
+    -- Kiểm tra đơn hàng có thuộc về user này không
+    IF NOT EXISTS (SELECT 1 FROM ORDERS WHERE ORDER_ID = @OrderID AND USER_ID = @UserID)
+    BEGIN
+        RAISERROR(N'Không tìm thấy đơn hàng hoặc không tồn tại.', 16, 1);
+        RETURN;
+    END
+
+    -- Kiểm tra trạng thái đơn hàng chỉ cho phép hủy đơn hàng khi đang ở trạng thái 'Pending'
+    DECLARE @CurrentStatus VARCHAR(20);
+    SELECT @CurrentStatus = STATUS FROM ORDERS WHERE ORDER_ID = @OrderID;
+
+    IF @CurrentStatus <> 'Pending'
+    BEGIN
+        RAISERROR(N'Chỉ có thể hủy đơn hàng đang ở trạng thái Pending.', 16, 1);
+        RETURN;
+    END
+
+    -- Cập nhật trạng thái đơn hàng thành 'Cancelled'
+    UPDATE ORDERS SET STATUS = 'Cancelled' WHERE ORDER_ID = @OrderID;
+
+    -- Trả về thông báo thành công
+    SELECT
+        ORDER_ID AS OrderID,
+        STATUS AS [Trạng thái mới],
+        N'Đơn hàng đã được hủy thành công.' AS [Thông báo]
+    FROM ORDERS
+    WHERE ORDER_ID = @OrderID;
 END;
 GO
 

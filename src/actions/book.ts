@@ -7,13 +7,14 @@ export async function getBooks(): Promise<any> {
   return withTiming(async () => {
     const queryText = `SELECT
     BOOK_ID AS ID,
-    BOOK_NAME AS [Tên Sách],
-    AUTHOR_NAME AS [Tác Giả],
-    CATEGORY_NAME AS [Thể Loại],
+    BOOK_NAME AS [Tên sách],
+    AUTHOR_NAME AS [Tác giả],
+    CATEGORY_NAME AS [Thể loại],
     PRICE AS [Giá],
-    QUANTITY AS [Số Lượng],
-    IMAGE AS [URL Ảnh Bìa],
-    CREATED_AT AS [Ngày Tạo]
+    QUANTITY AS [Số lượng],
+    IMAGE AS [URL ảnh bìa],
+    DESCRIPTION AS [Mô tả],
+    CREATED_AT AS [Ngày tạo]
 FROM BOOKS
 JOIN AUTHORS ON BOOKS.AUTHOR_ID = AUTHORS.AUTHOR_ID
 JOIN CATEGORIES ON CATEGORIES.CATEGORY_ID = BOOKS.CATEGORY_ID
@@ -29,13 +30,13 @@ ORDER BY CREATED_AT DESC
         sqlText: queryText,
         result: result.recordset,
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching books: ", error)
       return {
         success: false,
         sqlText: queryText,
         result: null,
-        error: "Lỗi khi lấy danh sách sản phẩm."
+        error: error.message || "Lỗi khi lấy danh sách sản phẩm."
       }
     }
   })

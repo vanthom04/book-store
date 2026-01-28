@@ -27,13 +27,13 @@ WHERE C.USER_ID = ${user.USER_ID}
         sqlText: queryText,
         result: result.recordset
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error query:", error)
       return {
         success: false,
         sqlText: queryText,
         result: null,
-        error: "Lỗi khi truy xuất giỏ hàng."
+        error: error.message || "Lỗi khi truy xuất giỏ hàng."
       }
     }
   })
@@ -57,13 +57,13 @@ export async function addToCart(bookId: number, quantity: number) {
         sqlText: queryText,
         result: result.recordset
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error)
       return {
         success: false,
         sqlText: queryText,
         result: null,
-        error: "Lỗi khi thêm vào giỏ hàng."
+        error: error.message || "Lỗi khi thêm vào giỏ hàng."
       }
     }
   })
