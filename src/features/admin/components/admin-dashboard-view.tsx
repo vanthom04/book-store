@@ -6,9 +6,12 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SqlResultViewer } from "@/components/sql-result-viewer"
+import { getMonthlyRevenue, getBestSellingBooks } from "@/actions/dashboard"
+import { BestSellingBooksModal } from "./best-selling-books-modal"
 
 export const AdminDashboardView = () => {
   const [isPending, setIsPending] = useState(false)
+  const [showBestSellingBooksModal, setShowBestSellingBooksModal] = useState(false)
   const [actionName, setActionName] = useState<string | null>(null)
   const [demoSql, setDemoSql] = useState<{
     query: string
@@ -20,7 +23,6 @@ export const AdminDashboardView = () => {
     data: []
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAction = async (actionName: string, actionFn: () => Promise<any>) => {
     toast.loading(`Đang thực hiện ${actionName}...`, { id: actionName })
     setIsPending(true)
@@ -49,73 +51,89 @@ export const AdminDashboardView = () => {
   }
 
   return (
-    <div className="flex flex-1 px-4 lg:px-6 py-4 items-stretch">
-      <div className="w-1/4 space-y-4 overflow-y-auto">
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Doanh thu hàng tháng
-        </Button>
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Top sách bán chạy
-        </Button>
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Thêm sách
-        </Button>
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Cập nhật sách
-        </Button>
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Xóa sách
-        </Button>
-        <Button
-          size="lg"
-          className="w-full"
-          variant="secondary"
-          disabled={isPending}
-          onClick={() => alert("Chức năng đang phát triển")}
-        >
-          Xem đơn
-        </Button>
+    <>
+      <BestSellingBooksModal
+        isOpen={showBestSellingBooksModal}
+        onClose={() => setShowBestSellingBooksModal(false)}
+        onAction={(data) => {
+          setShowBestSellingBooksModal(false)
+          handleAction("Top sách bán chạy", () =>
+            getBestSellingBooks(data.year, data.month, data.topN)
+          )
+        }}
+      />
+      <div className="flex flex-1 px-4 lg:px-6 py-4 items-stretch">
+        <div className="w-1/4 space-y-4 overflow-y-auto">
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() =>
+              handleAction("Doanh thu hàng tháng", () =>
+                getMonthlyRevenue(Number(prompt("Nhập năm: ", new Date().getFullYear().toString())))
+              )
+            }
+          >
+            Doanh thu hàng tháng
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => setShowBestSellingBooksModal(true)}
+          >
+            Top sách bán chạy
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => alert("Chức năng đang phát triển")}
+          >
+            Thêm sách
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => alert("Chức năng đang phát triển")}
+          >
+            Cập nhật sách
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => alert("Chức năng đang phát triển")}
+          >
+            Xóa sách
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => alert("Chức năng đang phát triển")}
+          >
+            Xem đơn
+          </Button>
+        </div>
+        <Separator orientation="vertical" className="mx-4" />
+        <div className="w-3/4 overflow-y-auto">
+          <h2 className="text-xl font-bold mb-4">⚡DEMO: {actionName || "SQL Server Response"}</h2>
+          <SqlResultViewer
+            query={demoSql.query}
+            data={demoSql.data}
+            error={demoSql.error}
+            executionTime={demoSql.executionTime ? `${demoSql.executionTime} ms` : undefined}
+          />
+        </div>
       </div>
-      <Separator orientation="vertical" className="mx-4" />
-      <div className="w-3/4 overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">⚡DEMO: {actionName || "SQL Server Response"}</h2>
-        <SqlResultViewer
-          query={demoSql.query}
-          data={demoSql.data}
-          error={demoSql.error}
-          executionTime={demoSql.executionTime ? `${demoSql.executionTime} ms` : undefined}
-        />
-      </div>
-    </div>
+    </>
   )
 }

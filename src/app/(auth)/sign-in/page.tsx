@@ -95,6 +95,12 @@ export default function SignInPage() {
             <p className="text-sm">Chào mừng quay lại. Đăng nhập để tiếp tục</p>
           </div>
 
+          <div className="flex flex-col border p-2 rounded-md">
+            <h3 className="font-semibold mb-1">Tài khoản admin demo:</h3>
+            <p className="text-sm">Email: ADMIN@BOOKSTORE.COM</p>
+            <p className="text-sm">Mật khẩu: 123456</p>
+          </div>
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="block text-sm">
