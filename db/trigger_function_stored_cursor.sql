@@ -63,7 +63,7 @@ END;
 GO
 
 -- ============================= TRIGGER =============================
--- 1. Quản lý tồn kho: Trừ khi mua (Pending -> Delivering) và Hoàn khi hủy (Cancelled)
+-- 1. Quản lý tồn kho hoàn lại khi hủy đơn hàng (Cancelled)
 CREATE TRIGGER TRG_InventoryManagement
 ON ORDERS
 AFTER UPDATE
@@ -71,26 +71,16 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Trừ kho khi đơn hàng được xác nhận (Chuyển từ Pending sang Delivering)
+    -- Xử lý khi trạng thái (Status) chuyển sang 'Cancelled'
     IF UPDATE(STATUS)
     BEGIN
-        UPDATE B
-        SET B.QUANTITY = B.QUANTITY - OD.QUANTITY
-        FROM BOOKS B
-        INNER JOIN ORDER_DETAILS OD ON B.BOOK_ID = OD.BOOK_ID
-        INNER JOIN inserted I ON OD.ORDER_ID = I.ORDER_ID
-        INNER JOIN deleted D ON I.ORDER_ID = D.ORDER_ID
-        WHERE I.STATUS = 'Delivering' AND D.STATUS = 'Pending';
-
-        -- Hoàn kho khi đơn hàng bị hủy (Chuyển sang Cancelled)
-        -- Chỉ hoàn kho nếu trạng thái cũ là 'Delivering' hoặc 'Completed'
-        UPDATE B
-        SET B.QUANTITY = B.QUANTITY + OD.QUANTITY
-        FROM BOOKS B
-        INNER JOIN ORDER_DETAILS OD ON B.BOOK_ID = OD.BOOK_ID
-        INNER JOIN inserted I ON OD.ORDER_ID = I.ORDER_ID
-        INNER JOIN deleted D ON I.ORDER_ID = D.ORDER_ID
-        WHERE I.STATUS = 'Cancelled' AND (D.STATUS = 'Delivering' OR D.STATUS = 'Completed');
+        UPDATE b
+        SET b.QUANTITY = b.QUANTITY + od.QUANTITY
+        FROM BOOKS b
+        INNER JOIN ORDER_DETAILS od ON b.BOOK_ID = od.BOOK_ID
+        INNER JOIN inserted i ON od.ORDER_ID = i.ORDER_ID
+        WHERE i.STATUS = 'Cancelled'
+            AND i.STATUS <> (SELECT STATUS FROM deleted WHERE ORDER_ID = i.ORDER_ID)
     END
 END
 GO
@@ -202,7 +192,7 @@ BEGIN
     END;
 
     -- Nếu chưa có thì tạo mới user
-    INSERT INTO USERS (FULL_NAME, EMAIL, PASSWORD_HASH, PHONE, ADDRESS) VALUES (@FullName, @Email, @PasswordHash, @Phone, @Address);
+    INSERT INTO USERS (FULL_NAME, EMAIL, PASSWORD_HASH, PHONE, ADDRESS) VALUES (@FullName, LOWER(@Email), @PasswordHash, @Phone, @Address);
 
     -- Trả về thông báo thành công
     SELECT SCOPE_IDENTITY() AS NewUserID, N'Đăng ký tài khoản thành công!' AS [Thông báo];
@@ -321,7 +311,7 @@ BEGIN
 
         DECLARE @CartID INT;
         DECLARE @NewOrderID INT;
-        DECLARE @TotalAmount DECIMAL(12, 2);
+        DECLARE @TotalAmount DECIMAL(18, 2);
 
         -- Lấy CartID của user
         SELECT @CartID = CART_ID FROM CARTS WHERE USER_ID = @UserID;
@@ -341,6 +331,19 @@ BEGIN
             RETURN;
         END;
 
+        -- Kiểm tra tồn kho
+        IF EXISTS (
+            SELECT 1
+            FROM CART_ITEMS ci
+            JOIN BOOKS b ON ci.BOOK_ID = b.BOOK_ID
+            WHERE ci.CART_ID = @CartID AND ci.QUANTITY > b.QUANTITY
+        )
+        BEGIN
+            RAISERROR(N'Số lượng sản phẩm trong giỏ hàng vượt quá số lượng tồn kho', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END;
+
         -- Tạo đơn hàng
         INSERT INTO ORDERS (USER_ID, RECEIVER_NAME, RECEIVER_PHONE, SHIPPING_ADDRESS, TOTAL_AMOUNT, PAYMENT_METHOD) VALUES (@UserID, @ReceiverName, @ReceiverPhone, @ShippingAddress, 0, @PaymentMethod);
 
@@ -353,12 +356,18 @@ BEGIN
         FROM CART_ITEMS ci
         JOIN BOOKS b ON ci.BOOK_ID = b.BOOK_ID
         WHERE ci.CART_ID = @CartID;
+        
+        -- Cập nhật tồn kho
+        UPDATE b
+        SET b.QUANTITY = b.QUANTITY - ci.QUANTITY
+        FROM BOOKS b
+        JOIN CART_ITEMS ci ON b.BOOK_ID = ci.BOOK_ID
+        WHERE ci.CART_ID = @CartID;
 
-        -- Trigger TRG_CheckStockBeforeOrder sẽ kiểm tra tồn kho và chặn nếu không đủ
-
-        -- Cập nhật lại TOTAL_AMOUNT cho đơn hàng
+        -- Tính tổng tiền đơn hàng
         SET @TotalAmount = dbo.fn_CalculateOrderTotal(@NewOrderID);
 
+        -- Cập nhật lại TOTAL_AMOUNT cho đơn hàng
         UPDATE ORDERS
         SET TOTAL_AMOUNT = @TotalAmount
         WHERE ORDER_ID = @NewOrderID;
@@ -384,7 +393,7 @@ BEGIN
 END;
 GO
 
--- 4. Stored Procedure
+-- 4. Stored Procedure lịch sử mua hàng
 CREATE PROC sp_GetUserOrderHistory (
     @UserID INT,
     @Status VARCHAR(20) = NULL
@@ -454,7 +463,7 @@ BEGIN
         b.PRICE AS [Giá bán],
         b.IMAGE AS [Hình ảnh],
         SUM(od.QUANTITY) AS [Tổng số đã bán],
-        SUM(od.QUANTITY * od.PRICE) AS [Tổng doanh thu]
+        ISNULL(SUM(od.QUANTITY * od.PRICE), 0) AS [Tổng doanh thu]
     FROM ORDER_DETAILS od
     JOIN ORDERS o ON od.ORDER_ID = o.ORDER_ID
     JOIN BOOKS b ON od.BOOK_ID = b.BOOK_ID
@@ -467,27 +476,146 @@ BEGIN
 END;
 GO
 
--- 7. Stored Procedure cập nhật thông tin sách 
-CREATE PROC sp_UpdateBookInfo (
-    @BookID INT,
+-- 7. Stored Procedure thêm sách mới
+CREATE PROC sp_CreateBook (
+    @RequestUserID INT,
     @BookName NVARCHAR(255),
-    @PublishYear INT,
-    @Language NVARCHAR(50),
-    @Pages INT,
-    @Image VARCHAR(255),
+    @AuthorID INT,
+    @Price DECIMAL(18, 2),
     @Quantity INT,
-    @Price DECIMAL(12, 2),
+    @Description NVARCHAR(MAX),
     @CategoryID INT,
+    @Pages INT,
+    @Language NVARCHAR(50),
+    @PublishYear INT,
     @PublisherID INT,
-    @AuthorID INT
+    @Image VARCHAR(255) = NULL
 )
 AS
 BEGIN
     SET NOCOUNT ON;
 
+    DECLARE @UserRole VARCHAR(20);
+
+    SELECT @UserRole = ROLE 
+    FROM USERS 
+    WHERE USER_ID = @RequestUserID;
+
+    IF @UserRole IS NULL OR @UserRole <> 'ADMIN'
+    BEGIN
+        RAISERROR(N'Bạn không có quyền thực hiện chức năng này (Chỉ dành cho Admin)!', 16, 1);
+        RETURN;
+    END
+
+    IF @Price <= 0
+    BEGIN
+        RAISERROR(N'Giá sách phải lớn hơn 0!', 16, 1);
+        RETURN;
+    END
+
+    IF @Quantity < 0
+    BEGIN
+        RAISERROR(N'Số lượng không được âm!', 16, 1);
+        RETURN;
+    END
+
+    IF EXISTS (SELECT 1 FROM BOOKS WHERE BOOK_NAME = @BookName AND IS_DELETED = 0)
+    BEGIN
+        RAISERROR(N'Sách này đã tồn tại trong kho!', 16, 1);
+        RETURN;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM AUTHORS WHERE AUTHOR_ID = @AuthorID)
+    BEGIN
+        RAISERROR(N'Tác giả không tồn tại!', 16, 1);
+        RETURN;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM CATEGORIES WHERE CATEGORY_ID = @CategoryID)
+    BEGIN
+        RAISERROR(N'Danh mục không tồn tại!', 16, 1);
+        RETURN;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM PUBLISHERS WHERE PUBLISHER_ID = @PublisherID)
+    BEGIN
+        RAISERROR(N'Nhà xuất bản không tồn tại!', 16, 1);
+        RETURN;
+    END
+
     BEGIN TRY
-        -- Kiểm tra xem sách có tồn tại không
-        IF NOT EXISTS (SELECT 1 FROM BOOKS WHERE BOOK_ID = @BookID)
+        INSERT INTO BOOKS (
+            BOOK_NAME,
+            AUTHOR_ID,
+            PRICE,
+            QUANTITY,
+            DESCRIPTION,
+            CATEGORY_ID,
+            PAGES,
+            LANGUAGE,
+            PUBLISH_YEAR,
+            PUBLISHER_ID,
+            IMAGE
+        )
+        VALUES (
+            @BookName,
+            @AuthorID,
+            @Price,
+            @Quantity,
+            @Description,
+            @CategoryID,
+            @Pages,
+            @Language,
+            @PublishYear,
+            @PublisherID,
+            @Image
+        );
+
+        -- Trả về thông tin sách vừa tạo
+        SELECT * FROM BOOKS WHERE BOOK_ID = SCOPE_IDENTITY();
+    END TRY
+    BEGIN CATCH
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
+END;
+GO
+
+-- 7. Stored Procedure cập nhật thông tin sách 
+CREATE PROC sp_UpdateBookInfo (
+    @RequestUserID INT,
+    @BookID INT,
+    @BookName NVARCHAR(255),
+    @AuthorID INT,
+    @Price DECIMAL(18, 2),
+    @Quantity INT,
+    @Description NVARCHAR(MAX),
+    @CategoryID INT,
+    @Pages INT,
+    @Language NVARCHAR(50),
+    @PublishYear INT,
+    @PublisherID INT,
+    @Image VARCHAR(255) = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @UserRole VARCHAR(20);
+
+    SELECT @UserRole = ROLE 
+    FROM USERS 
+    WHERE USER_ID = @RequestUserID;
+
+    IF @UserRole IS NULL OR @UserRole <> 'ADMIN'
+    BEGIN
+        RAISERROR(N'Bạn không có quyền thực hiện chức năng này (Chỉ dành cho Admin)!', 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRY
+        -- Kiểm tra xem sách có tồn tại và có bị xóa không
+        IF NOT EXISTS (SELECT 1 FROM BOOKS WHERE BOOK_ID = @BookID AND IS_DELETED = 0)
         BEGIN
             RAISERROR(N'Sách không tồn tại!', 16, 1);
             RETURN;
@@ -497,15 +625,16 @@ BEGIN
         UPDATE BOOKS
         SET
             BOOK_NAME = @BookName,
-            PUBLISH_YEAR = @PublishYear,
-            LANGUAGE = @Language,
-            PAGES = @Pages,
-            IMAGE = @Image,
-            QUANTITY = @Quantity,
-            PRICE = @Price,
-            CATEGORY_ID = @CategoryID,
-            PUBLISHER_ID = @PublisherID,
             AUTHOR_ID = @AuthorID,
+            PRICE = @Price,
+            QUANTITY = @Quantity,
+            DESCRIPTION = @Description,
+            CATEGORY_ID = @CategoryID,
+            PAGES = @Pages,
+            LANGUAGE = @Language,
+            PUBLISH_YEAR = @PublishYear,
+            PUBLISHER_ID = @PublisherID,
+            IMAGE = @Image,
             UPDATED_AT = GETDATE()
         WHERE BOOK_ID = @BookID;
 
@@ -557,7 +686,7 @@ BEGIN
 END;
 GO
 
--- 9. Stored Procedure thống kê trang dashboard admin
+-- 9. Stored Procedure thống kê trang dashboard admin (có thể bỏ)
 CREATE PROC sp_GetAdminDashboardStats
 AS
 BEGIN

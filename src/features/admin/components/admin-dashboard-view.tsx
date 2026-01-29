@@ -5,12 +5,18 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { createBook, updateBook } from "@/actions/book"
 import { SqlResultViewer } from "@/components/sql-result-viewer"
 import { getMonthlyRevenue, getBestSellingBooks } from "@/actions/dashboard"
+
+import { CreateBookModal } from "./create-book-modal"
+import { UpdateBookModal } from "./update-book-modal"
 import { BestSellingBooksModal } from "./best-selling-books-modal"
 
 export const AdminDashboardView = () => {
   const [isPending, setIsPending] = useState(false)
+  const [showUpdateBookModal, setShowUpdateBookModal] = useState(false)
+  const [showCreateBookModal, setShowCreateBookModal] = useState(false)
   const [showBestSellingBooksModal, setShowBestSellingBooksModal] = useState(false)
   const [actionName, setActionName] = useState<string | null>(null)
   const [demoSql, setDemoSql] = useState<{
@@ -62,6 +68,16 @@ export const AdminDashboardView = () => {
           )
         }}
       />
+      <CreateBookModal
+        isOpen={showCreateBookModal}
+        onClose={() => setShowCreateBookModal(false)}
+        onAction={(data) => handleAction("Thêm sách", () => createBook(data))}
+      />
+      <UpdateBookModal
+        isOpen={showUpdateBookModal}
+        onClose={() => setShowUpdateBookModal(false)}
+        onAction={(data) => handleAction("Cập nhật sách", () => updateBook(data))}
+      />
       <div className="flex flex-1 px-4 lg:px-6 py-4 items-stretch">
         <div className="w-1/4 space-y-4 overflow-y-auto">
           <Button
@@ -91,7 +107,7 @@ export const AdminDashboardView = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowCreateBookModal(true)}
           >
             Thêm sách
           </Button>
@@ -100,7 +116,7 @@ export const AdminDashboardView = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowUpdateBookModal(true)}
           >
             Cập nhật sách
           </Button>

@@ -33,13 +33,14 @@ export const CreateOrderModal = ({ isOpen, onClose, onAction }: Props) => {
     payment: "COD"
   })
 
-  const handleClose = () => {
+  const handleSubmit = () => {
+    onAction(orderForm)
+    setOrderForm({ name: "", phone: "", address: "", payment: "COD" })
     onClose()
-    setOrderForm({ name: "", phone: "", address: "", payment: "" })
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl! max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tạo đơn hàng</DialogTitle>
@@ -109,8 +110,8 @@ export const CreateOrderModal = ({ isOpen, onClose, onAction }: Props) => {
           </div>
         </div>
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={handleClose}>Hủy</Button>
-          <Button onClick={() => onAction(orderForm)}>Tạo đơn hàng</Button>
+          <Button variant="outline" onClick={onClose}>Hủy</Button>
+          <Button onClick={handleSubmit}>Tạo đơn hàng</Button>
         </div>
       </DialogContent>
     </Dialog>

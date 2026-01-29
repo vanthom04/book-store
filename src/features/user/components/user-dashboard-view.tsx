@@ -72,12 +72,9 @@ export const UserDashboardView = () => {
       <CreateOrderModal
         isOpen={showCreateOrderModal}
         onClose={() => setShowCreateOrderModal(false)}
-        onAction={(orderData) => {
-          setShowCreateOrderModal(false)
-          handleAction("Tạo đơn hàng", () =>
-            createOrder(orderData.name, orderData.phone, orderData.address, orderData.payment)
-          )
-        }}
+        onAction={(orderData) => handleAction("Tạo đơn hàng", () =>
+          createOrder(orderData.name, orderData.phone, orderData.address, orderData.payment)
+        )}
       />
       <CancelOrderModal
         isOpen={showCancelOrderModal}
