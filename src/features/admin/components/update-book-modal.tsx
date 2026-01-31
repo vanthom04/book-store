@@ -23,7 +23,7 @@ import {
 
 const INITIAL_BOOK_FORM = {
   bookId: 1,
-  name: "",
+  bookName: "",
   authorId: 1,
   categoryId: 1,
   price: "",
@@ -64,7 +64,7 @@ export const UpdateBookModal = ({ isOpen, onClose, onAction }: Props) => {
         setBookForm({
           ...bookForm,
           bookId: booksRes.result[0].ID,
-          name: booksRes.result[0]["Tên sách"],
+          bookName: booksRes.result[0]["Tên sách"],
           authorId: booksRes.result[0].AuthorID,
           categoryId: booksRes.result[0].CategoryID,
           price: booksRes.result[0]["Giá"],
@@ -93,7 +93,7 @@ export const UpdateBookModal = ({ isOpen, onClose, onAction }: Props) => {
 
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -121,7 +121,7 @@ export const UpdateBookModal = ({ isOpen, onClose, onAction }: Props) => {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Chọn sách muốn cập nhật</Label>
+              <Label htmlFor="book">Chọn sách muốn cập nhật</Label>
               <Select
                 required
                 value={bookForm.bookId.toString()}
@@ -133,7 +133,7 @@ export const UpdateBookModal = ({ isOpen, onClose, onAction }: Props) => {
                     setBookForm({
                       ...bookForm,
                       bookId: book.ID,
-                      name: book["Tên sách"],
+                      bookName: book["Tên sách"],
                       authorId: book.AuthorID,
                       categoryId: book.CategoryID,
                       price: book["Giá"],
@@ -161,13 +161,13 @@ export const UpdateBookModal = ({ isOpen, onClose, onAction }: Props) => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="name">Tên sách</Label>
+              <Label htmlFor="bookName">Tên sách</Label>
               <Input
                 required
-                id="name"
+                id="bookName"
                 autoComplete="off"
-                value={bookForm.name}
-                onChange={(e) => setBookForm({ ...bookForm, name: e.target.value })}
+                value={bookForm.bookName}
+                onChange={(e) => setBookForm({ ...bookForm, bookName: e.target.value })}
                 placeholder="Nhập tên sách..."
               />
             </div>

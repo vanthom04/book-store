@@ -5,18 +5,39 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { createBook, updateBook } from "@/actions/book"
 import { SqlResultViewer } from "@/components/sql-result-viewer"
-import { getMonthlyRevenue, getBestSellingBooks } from "@/actions/dashboard"
+import { startDelivery, cancelOrder, completeOrder } from "@/actions/order"
+import {
+  createBook,
+  updateBook,
+  softDeleteBook,
+  hardDeleteBook,
+  deleteCategory
+} from "@/actions/book"
+import {
+  getMonthlyRevenue,
+  getBestSellingBooks,
+  getDailyRevenue,
+  getCategoryReport,
+  getCustomerRankingReport
+} from "@/actions/store"
 
+import { OrdersForAdmin } from "./orders-for-admin"
 import { CreateBookModal } from "./create-book-modal"
 import { UpdateBookModal } from "./update-book-modal"
+import { DeleteCategoryModal } from "./delete-category-modal"
+import { SoftDeleteBookModal } from "./soft-delete-book-modal"
+import { HardDeleteBookModal } from "./hard-delete-book-modal"
 import { BestSellingBooksModal } from "./best-selling-books-modal"
 
 export const AdminDashboardView = () => {
   const [isPending, setIsPending] = useState(false)
-  const [showUpdateBookModal, setShowUpdateBookModal] = useState(false)
   const [showCreateBookModal, setShowCreateBookModal] = useState(false)
+  const [showUpdateBookModal, setShowUpdateBookModal] = useState(false)
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false)
+  const [showSoftDeleteBookModal, setShowSoftDeleteBookModal] = useState(false)
+  const [showHardDeleteBookModal, setShowHardDeleteBookModal] = useState(false)
+  const [showOrdersForAdminModal, setShowOrdersForAdminModal] = useState(false)
   const [showBestSellingBooksModal, setShowBestSellingBooksModal] = useState(false)
   const [actionName, setActionName] = useState<string | null>(null)
   const [demoSql, setDemoSql] = useState<{
@@ -78,8 +99,61 @@ export const AdminDashboardView = () => {
         onClose={() => setShowUpdateBookModal(false)}
         onAction={(data) => handleAction("Cập nhật sách", () => updateBook(data))}
       />
+      <SoftDeleteBookModal
+        isOpen={showSoftDeleteBookModal}
+        onClose={() => setShowSoftDeleteBookModal(false)}
+        onAction={(bookId) => {
+          setShowSoftDeleteBookModal(false)
+          handleAction("Xóa mềm sách", () => softDeleteBook(bookId))
+        }}
+      />
+      <HardDeleteBookModal
+        isOpen={showHardDeleteBookModal}
+        onClose={() => setShowHardDeleteBookModal(false)}
+        onAction={(bookId) => {
+          setShowHardDeleteBookModal(false)
+          handleAction("Xóa vĩnh viễn sách", () => hardDeleteBook(bookId))
+        }}
+      />
+      <DeleteCategoryModal
+        isOpen={showDeleteCategoryModal}
+        onClose={() => setShowDeleteCategoryModal(false)}
+        onAction={(categoryId) => {
+          setShowDeleteCategoryModal(false)
+          handleAction("Xóa thể loại sách", () => deleteCategory(categoryId))
+        }}
+      />
+      <OrdersForAdmin
+        isOpen={showOrdersForAdminModal}
+        onClose={() => setShowOrdersForAdminModal(false)}
+        onAction={(orderId, status) => {
+          setShowOrdersForAdminModal(false)
+          handleAction("Quản lý đơn hàng", async () => {
+            if (status === "Cancelled") {
+              return cancelOrder(orderId)
+            } else if (status === "Completed") {
+              return completeOrder(orderId)
+            } else if (status === "Delivering") {
+              return startDelivery(orderId)
+            }
+          })
+        }}
+      />
       <div className="flex flex-1 px-4 lg:px-6 py-4 items-stretch">
         <div className="w-1/4 space-y-4 overflow-y-auto">
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => {
+              handleAction("Doanh thu theo ngày", () =>
+                getDailyRevenue(prompt("Nhập ngày: ", new Date().toISOString().split("T")[0]))
+              )
+            }}
+          >
+            Doanh thu theo ngày (FUNCTION)
+          </Button>
           <Button
             size="lg"
             className="w-full"
@@ -125,18 +199,54 @@ export const AdminDashboardView = () => {
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowSoftDeleteBookModal(true)}
           >
-            Xóa sách
+            Xóa mềm sách
           </Button>
           <Button
             size="lg"
             className="w-full"
             variant="secondary"
             disabled={isPending}
-            onClick={() => alert("Chức năng đang phát triển")}
+            onClick={() => setShowHardDeleteBookModal(true)}
           >
-            Xem đơn
+            Xóa vĩnh viễn sách
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => setShowDeleteCategoryModal(true)}
+          >
+            Xóa thể loại sách
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => setShowOrdersForAdminModal(true)}
+          >
+            Quản lý đơn hàng
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => handleAction("Báo cáo doanh thu theo danh mục", getCategoryReport)}
+          >
+            Báo cáo doanh thu theo danh mục
+          </Button>
+          <Button
+            size="lg"
+            className="w-full"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => handleAction("Báo cáo xếp hạng khách hàng", getCustomerRankingReport)}
+          >
+            Báo cáo xếp hạng khách hàng
           </Button>
         </div>
         <Separator orientation="vertical" className="mx-4" />

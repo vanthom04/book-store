@@ -69,7 +69,7 @@ export const CreateBookModal = ({ isOpen, onClose, onAction }: Props) => {
     }
 
     fetchData()
-  }, [])
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

@@ -62,6 +62,38 @@ ORDER BY CATEGORY_NAME ASC
   })
 }
 
+export async function deleteCategory(categoryId: any) {
+  const user = await getCurrentUser()
+
+  return withTiming(async () => {
+    const queryText = `EXEC sp_DeleteCategory
+      @RequestUserID = ${user.USER_ID},
+      @CategoryID = ${categoryId}
+  `
+
+    try {
+      const result = await executeSP("sp_DeleteCategory", {
+        RequestUserID: user.USER_ID,
+        CategoryID: categoryId
+      })
+
+      return {
+        success: true,
+        sqlText: queryText,
+        result: result.recordset
+      }
+    } catch (error: any) {
+      console.error("Error deleting category:", error)
+      return {
+        success: false,
+        sqlText: queryText,
+        result: null,
+        error: error.message || "Lỗi khi xóa thể loại."
+      }
+    }
+  })
+}
+
 export async function getPublishers(): Promise<any> {
   return withTiming(async () => {
     const queryText = `SELECT
@@ -106,10 +138,6 @@ export async function createBook({
 }: any) {
   const user = await getCurrentUser()
 
-  if (!user || user.ROLE !== "ADMIN") {
-    return { success: false, error: "Unauthorized" }
-  }
-
   return withTiming(async () => {
     const queryText = `EXEC sp_CreateBook
       @RequestUserID = ${user.USER_ID},
@@ -123,7 +151,7 @@ export async function createBook({
       @Language = '${language}',
       @PublishYear = ${publishYear},
       @PublisherID = ${publisherId},
-      @Image = ${image || 'NULL'}
+      @Image = ${image ? `'${image}'` : 'NULL'}
   `
 
     try {
@@ -175,25 +203,21 @@ export async function updateBook({
 }: any) {
   const user = await getCurrentUser()
 
-  if (!user || user.ROLE !== "ADMIN") {
-    return { success: false, error: "Unauthorized" }
-  }
-
   return withTiming(async () => {
     const queryText = `EXEC sp_UpdateBookInfo
       @RequestUserID = ${user.USER_ID},
       @BookID = ${bookId},
-      @BookName = ${bookName},
+      @BookName = '${bookName}',
       @AuthorID = ${authorId},
       @CategoryID = ${categoryId},
       @Price = ${price},
       @Quantity = ${quantity},
-      @Description = ${description},
+      @Description = '${description}',
       @Pages = ${pages},
-      @Language = ${language},
+      @Language = '${language}',
       @PublishYear = ${publishYear},
       @PublisherID = ${publisherId},
-      @Image = ${image || 'NULL'}
+      @Image = ${image ? `'${image}'` : 'NULL'}
   `
 
     try {
@@ -230,7 +254,71 @@ export async function updateBook({
   })
 }
 
-export async function getBooks(): Promise<any> {
+export async function softDeleteBook(bookId: any) {
+  const user = await getCurrentUser()
+
+  return withTiming(async () => {
+    const queryText = `EXEC sp_SoftDeleteBook
+      @RequestUserID = ${user.USER_ID},
+      @BookID = ${bookId}
+  `
+
+    try {
+      const result = await executeSP("sp_SoftDeleteBook", {
+        RequestUserID: user.USER_ID,
+        BookID: bookId
+      })
+
+      return {
+        success: true,
+        sqlText: queryText,
+        result: result.recordset
+      }
+    } catch (error: any) {
+      console.error("Error soft deleting book:", error)
+      return {
+        success: false,
+        sqlText: queryText,
+        result: null,
+        error: error.message || "Lỗi khi xóa mềm sách."
+      }
+    }
+  })
+}
+
+export async function hardDeleteBook(bookId: any) {
+  const user = await getCurrentUser()
+
+  return withTiming(async () => {
+    const queryText = `EXEC sp_HardDeleteBook
+      @RequestUserID = ${user.USER_ID},
+      @BookID = ${bookId}
+  `
+
+    try {
+      const result = await executeSP("sp_HardDeleteBook", {
+        RequestUserID: user.USER_ID,
+        BookID: bookId
+      })
+
+      return {
+        success: true,
+        sqlText: queryText,
+        result: result.recordset
+      }
+    } catch (error: any) {
+      console.error("Error hard deleting book:", error)
+      return {
+        success: false,
+        sqlText: queryText,
+        result: null,
+        error: error.message || "Lỗi khi xóa cứng sách."
+      }
+    }
+  })
+}
+
+export async function getBooks(includeDeleted: boolean = false): Promise<any> {
   return withTiming(async () => {
     const queryText = `SELECT
     BOOK_ID AS ID,
@@ -253,7 +341,7 @@ FROM BOOKS
 JOIN AUTHORS ON BOOKS.AUTHOR_ID = AUTHORS.AUTHOR_ID
 JOIN CATEGORIES ON CATEGORIES.CATEGORY_ID = BOOKS.CATEGORY_ID
 JOIN PUBLISHERS ON PUBLISHERS.PUBLISHER_ID = BOOKS.PUBLISHER_ID
-WHERE IS_DELETED = 0
+${includeDeleted ? "" : "WHERE IS_DELETED = 0"}
 ORDER BY CREATED_AT DESC
 `
 
@@ -276,3 +364,4 @@ ORDER BY CREATED_AT DESC
     }
   })
 }
+

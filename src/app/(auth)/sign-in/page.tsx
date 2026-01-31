@@ -23,7 +23,12 @@ export default function SignInPage() {
   const router = useRouter()
 
   const [isPending, setIsPending] = useState(false)
-  const [demoSql, setDemoSql] = useState<{ sql: string; data: any[] } | null>(null)
+  const [demoSql, setDemoSql] = useState<{
+    sql: string
+    data: any[]
+    error?: string
+    executionTime?: string
+  } | null>(null)
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -42,15 +47,18 @@ export default function SignInPage() {
       const password = formData.get("pwd") as string
 
       const res = await signIn(email, password)
-      console.log(res)
 
-      if (res?.error) {
-        return toast.error(res.error)
-      }
+      setDemoSql({
+        sql: res.sqlText,
+        data: res.result || [],
+        executionTime: res.executionTime
+      })
 
       if (res.success) {
         toast.success("Đăng nhập thành công")
-        setDemoSql({ sql: res.sqlText, data: res.result || [] })
+      } else {
+        toast.error(res.error)
+        setDemoSql({ sql: res.sqlText, data: [], error: res.error })
       }
     } catch (error) {
       console.error("Error:", error)
@@ -73,15 +81,26 @@ export default function SignInPage() {
             </AlertDialogTitle>
           </AlertDialogHeader>
 
-          <div>{demoSql && <SqlResultViewer query={demoSql.sql} data={demoSql.data} />}</div>
+          <div>
+            {demoSql && (
+              <SqlResultViewer
+                query={demoSql.sql}
+                data={demoSql.data}
+                error={demoSql.error}
+                executionTime={demoSql.executionTime ? `${demoSql.executionTime} ms` : undefined}
+              />
+            )}
+          </div>
 
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setDemoSql(null)}>
               Đóng
             </Button>
-            <Button onClick={() => router.push("/")} className="bg-green-600 hover:bg-green-700">
-              Đi tới Trang chủ
-            </Button>
+            {!demoSql?.error && (
+              <Button onClick={() => router.push("/")} className="bg-green-600 hover:bg-green-700">
+                Đi tới Trang chủ
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -97,7 +116,7 @@ export default function SignInPage() {
 
           <div className="flex flex-col border p-2 rounded-md">
             <h3 className="font-semibold mb-1">Tài khoản admin demo:</h3>
-            <p className="text-sm">Email: ADMIN@BOOKSTORE.COM</p>
+            <p className="text-sm">Email: admin@bookstore.com</p>
             <p className="text-sm">Mật khẩu: 123456</p>
           </div>
 

@@ -24,7 +24,7 @@ export const AddToCartModal = ({ isOpen, onClose, onAction }: Props) => {
     }
 
     fetchBooks()
-  }, [])
+  }, [isOpen])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

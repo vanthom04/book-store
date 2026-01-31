@@ -38,6 +38,5 @@ export async function executeSP(procName: string, inputs: Record<string, any> = 
     request.input(key, inputs[key])
   })
 
-  const result = await request.execute(procName)
-  return result
+  return await request.execute(procName)
 }

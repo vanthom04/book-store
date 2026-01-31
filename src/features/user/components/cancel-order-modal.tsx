@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogDescription
 } from "@/components/ui/dialog"
+import { XCircle } from "lucide-react"
 
 interface Props {
   isOpen: boolean
@@ -40,16 +41,16 @@ export const CancelOrderModal = ({ isOpen, onClose, onAction }: Props) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl! h-[85vh]!">
+      <DialogContent className="max-w-5xl! h-[85vh]! flex flex-col justify-start">
         <DialogHeader>
           <DialogTitle>Hủy đơn hàng</DialogTitle>
           <DialogDescription>Chọn đơn hàng muốn hủy</DialogDescription>
         </DialogHeader>
-        <div className="max-h-[75vh] overflow-auto relative">
-          <Table className="border rounded-md">
+        <div className="flex-1 overflow-auto relative mt-4">
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">Order ID</TableHead>
+                <TableHead className="text-center">OrderID</TableHead>
                 <TableHead>Người nhận</TableHead>
                 <TableHead>Địa chỉ giao hàng</TableHead>
                 <TableHead className="text-center">Tổng tiền</TableHead>
@@ -79,12 +80,8 @@ export const CancelOrderModal = ({ isOpen, onClose, onAction }: Props) => {
                     {order["Ngày đặt hàng"].toLocaleString("vi-VN")}
                   </TableCell>
                   <TableCell className="flex items-center justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() => onAction(order.OrderID)}
-                      className="hover:bg-red-50 hover:text-red-600"
-                    >
-                      Hủy đơn hàng
+                    <Button size="sm" variant="destructive" onClick={() => onAction(order.OrderID)}>
+                      <XCircle className="w-4 h-4" /> Hủy
                     </Button>
                   </TableCell>
                 </TableRow>
