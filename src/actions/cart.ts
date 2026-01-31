@@ -10,10 +10,11 @@ export async function getCartDetails() {
 
   return withTiming(async () => {
     const queryText = `SELECT
-    B.BOOK_NAME AS [Tên Sách],
-    B.PRICE AS [Giá Gốc],
-    CI.QUANTITY AS [Số Lượng],
-    (B.PRICE * CI.QUANTITY) AS [Thành Tiền]
+    B.BOOK_NAME AS [Tên sách],
+    B.PRICE AS [Giá gốc],
+    CI.QUANTITY AS [Số lượng],
+    (B.PRICE * CI.QUANTITY) AS [Thành tiền],
+    C.UPDATED_AT AS [Cập nhật lần cuối]
 FROM CART_ITEMS CI
 INNER JOIN BOOKS B ON CI.BOOK_ID = B.BOOK_ID
 INNER JOIN CARTS C ON CI.CART_ID = C.CART_ID
