@@ -60,7 +60,7 @@ export const DeleteCategoryModal = ({ isOpen, onClose, onAction }: Props) => {
                     <TableCell className="flex-1 flex items-center justify-center">
                       <Button size="sm" variant="destructive" onClick={() => onAction(category.ID)}>
                         <Trash2 className="h-4 w-4" />
-                        Xóa mềm
+                        Xóa
                       </Button>
                     </TableCell>
                   </TableRow>
